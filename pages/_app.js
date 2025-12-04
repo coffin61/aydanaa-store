@@ -1,13 +1,13 @@
 // pages/_app.js
-import '../styles/globals.css';
-import { SessionProvider } from 'next-auth/react';
-import { Toaster } from 'react-hot-toast';
+import '@/styles/globals.css';
+import { Inter } from 'next/font/google';
 
-export default function App({ Component, pageProps: { session, ...pageProps } }) {
+const inter = Inter({ subsets: ['latin'] });
+
+export default function MyApp({ Component, pageProps }) {
   return (
-    <SessionProvider session={session}>
-      <Toaster position="top-center" />
+    <main className={inter.className}>
       <Component {...pageProps} />
-    </SessionProvider>
+    </main>
   );
 }
