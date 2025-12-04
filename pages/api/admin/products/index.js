@@ -1,7 +1,8 @@
-import { connectDB } from '@/lib/db';
+import connectDB from '@/lib/db';
+
 import Product from '@/models/Product';
 import { getServerSession } from 'next-auth/next';
-import { authOptions } from '../../auth/[...nextauth]';
+import { authOptions } from '@/pages/api/auth/[...nextauth]';
 
 export default async function handler(req, res) {
   await connectDB();

@@ -1,42 +1,51 @@
 import Link from 'next/link';
+import ProductCard from '@/components/ProductCard';
 
 export default function CategoryPage({ category, products }) {
-  if (!category) return <p className="p-8">دسته‌بندی یافت نشد</p>;
+  if (!category) {
+    return (
+      <div className="p-8 text-center text-gray-500">
+        <p>دسته‌بندی یافت نشد</p>
+        <Link href="/categories">
+          <span className="text-blue-600 underline cursor-pointer">
+            ← بازگشت به لیست دسته‌بندی‌ها
+          </span>
+        </Link>
+      </div>
+    );
+  }
 
   return (
-    <div className="max-w-5xl mx-auto p-8 space-y-6">
-      <h1 className="text-2xl font-bold text-blue-700">محصولات دسته: {category.title}</h1>
-      <p className="text-gray-600">{category.description}</p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
-        {products.map((product) => (
-          <Link key={product._id} href={`/product/${product.slug}`}>
-            <div className="border p-4 rounded shadow hover:shadow-md cursor-pointer space-y-2">
-              <img
-                src={product.image || '/placeholder.png'}
-                alt={product.title}
-                className="w-full h-48 object-cover rounded"
-              />
-              <h2 className="text-lg font-semibold text-gray-800">{product.title}</h2>
-              <p className="text-green-700 font-bold">
-                {product.price.toLocaleString()} تومان
-              </p>
-            </div>
-          </Link>
-        ))}
-      </div>
+    <div className="max-w-6xl mx-auto px-4 py-12">
+      <h1 className="text-3xl font-light mb-8">🗂️ دسته‌بندی: {category.title}</h1>
+      {products.length === 0 ? (
+        <p className="text-gray-500">محصولی در این دسته‌بندی یافت نشد.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+          {products.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-export async function getServerSideProps({ params }) {
-  const res = await fetch(`http://localhost:3000/api/categories/by-slug/${slug}`);
-  const data = await res.json();
+export async function getStaticPaths() {
+  const res = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/categories`);
+  const categories = await res.json();
+  const paths = categories.map((c) => ({ params: { slug: c.slug } }));
+  return { paths, fallback: false };
+}
 
-  return {
-    props: {
-      category: data.category || null,
-      products: data.products || [],
-    },
-  };
+export async function getStaticProps({ params }) {
+  try {
+    const resCat = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/categories/${params.slug}`);
+    const category = await resCat.json();
+    const resProducts = await fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/products?category=${params.slug}`);
+    const products = await resProducts.json();
+    return { props: { category, products } };
+  } catch {
+    return { props: { category: null, products: [] } };
+  }
 }

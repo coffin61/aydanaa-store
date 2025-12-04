@@ -1,0 +1,43 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  // توجه: در Prisma 7 دیگه نباید url اینجا باشه
+  // اتصال دیتابیس در فایل prisma.config.ts تعریف می‌شه
+}
+
+model Product {
+  id          Int       @id @default(autoincrement())
+  name        String
+  slug        String    @unique
+  description String?
+  price       Float
+  image       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // ارتباط‌ها
+  categoryId  Int
+  category    Category  @relation(fields: [categoryId], references: [id])
+
+  brandId     Int
+  brand       Brand     @relation(fields: [brandId], references: [id])
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String
+  slug      String    @unique
+  products  Product[]
+}
+
+model Brand {
+  id        Int       @id @default(autoincrement())
+  name      String
+  slug      String    @unique
+  products  Product[]
+}

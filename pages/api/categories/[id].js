@@ -1,67 +1,41 @@
-import { connectDB } from '../../../lib/db.js';
-import Category from '../../../models/Category.js';
-import formidable from 'formidable';
-import fs from 'fs';
-import path from 'path';
-
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+// pages/api/categories/[id].js
+import db from '../../../lib/db';
+import { requireRole } from '../../../lib/authGuard';
+import { logAudit } from '../../../lib/audit';
 
 export default async function handler(req, res) {
-  await connectDB();
+  const session = await requireRole(req, res, ['admin']);
+  if (!session) return;
+
   const { id } = req.query;
 
-  if (req.method === 'PUT') {
-    const form = formidable({ multiples: false, maxFileSize: 2 * 1024 * 1024 }); // 2MB
+  if (req.method === 'PATCH') {
+    const { name, slug } = req.body;
+    const [prevRows] = await db.query('SELECT * FROM categories WHERE id = ?', [id]);
+    if (prevRows.length === 0) return res.status(404).json({ error: 'دسته‌بندی پیدا نشد' });
+    const prev = prevRows[0];
 
-    form.parse(req, async (err, fields, files) => {
-      if (err) return res.status(400).json({ message: '❌ خطا در پردازش فایل یا فرم' });
+    const changes = {};
+    const fields = [];
+    const params = [];
 
-      const { title, slug, description } = fields;
-      let imagePath = null;
+    if (name && name !== prev.name) { fields.push('name = ?'); params.push(name); changes.name = { from: prev.name, to: name }; }
+    if (slug && slug !== prev.slug) { fields.push('slug = ?'); params.push(slug); changes.slug = { from: prev.slug, to: slug }; }
 
-      if (files.image) {
-        const file = files.image[0];
-        const ext = path.extname(file.originalFilename).toLowerCase();
-        const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
+    if (fields.length === 0) return res.status(200).json({ message: 'بدون تغییر' });
 
-        if (!allowed.includes(ext)) {
-          return res.status(415).json({ message: '❌ فقط فایل‌های تصویری مجاز هستند' });
-        }
+    params.push(id);
+    await db.query(`UPDATE categories SET ${fields.join(', ')} WHERE id = ?`, params);
+    await logAudit({ userId: session.user.id, entity: 'category', entityId: Number(id), action: 'update', changes });
 
-        const fileName = `${Date.now()}-${file.originalFilename.replace(/\s+/g, '-')}`;
-        const newPath = path.join(process.cwd(), 'public', 'uploads', fileName);
-
-        fs.renameSync(file.filepath, newPath);
-        imagePath = `/uploads/${fileName}`;
-
-        // حذف تصویر قبلی (اختیاری)
-        const old = await Category.findById(id);
-        if (old?.image) {
-          const oldPath = path.join(process.cwd(), 'public', old.image);
-          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
-        }
-      }
-
-      const updated = await Category.findByIdAndUpdate(
-        id,
-        {
-          title,
-          slug,
-          description,
-          ...(imagePath && { image: imagePath }),
-        },
-        { new: true }
-      );
-
-      if (!updated) return res.status(404).json({ message: 'دسته‌بندی یافت نشد' });
-      return res.status(200).json({ category: updated });
-    });
-    return;
+    return res.status(200).json({ message: 'به‌روزرسانی شد' });
   }
 
-  // سایر متدها (GET, DELETE) همون قبلی باقی می‌مونن
+  if (req.method === 'DELETE') {
+    await db.query('DELETE FROM categories WHERE id = ?', [id]);
+    await logAudit({ userId: session.user.id, entity: 'category', entityId: Number(id), action: 'delete', changes: {} });
+    return res.status(200).json({ message: 'حذف شد' });
+  }
+
+  res.status(405).json({ error: 'Method not allowed' });
 }

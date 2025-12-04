@@ -1,69 +1,46 @@
-import { connectDB } from '../../../lib/db.js';
-import Category from '../../../models/Category.js';
-import formidable from 'formidable';
-import fs from 'fs';
-import path from 'path';
+// pages/api/categories/index.js
+import db from '../../../lib/db';
+import { requireRole } from '../../../lib/authGuard';
+import { logAudit } from '../../../lib/audit';
 
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
+function slugify(name) {
+  return name.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+}
 
 export default async function handler(req, res) {
-  await connectDB();
-
-  if (req.method === 'POST') {
-    const form = formidable({ multiples: false, maxFileSize: 2 * 1024 * 1024 }); // 2MB
-
-    form.parse(req, async (err, fields, files) => {
-      if (err) return res.status(400).json({ message: '❌ خطا در پردازش فرم یا فایل' });
-
-      const { title, slug, description } = fields;
-
-      if (!title || !slug) {
-        return res.status(400).json({ message: 'عنوان و slug الزامی هستند' });
-      }
-
-      const exists = await Category.findOne({ slug });
-      if (exists) {
-        return res.status(409).json({ message: 'این slug قبلاً استفاده شده' });
-      }
-
-      let imagePath = null;
-
-      if (files.image) {
-        const file = files.image[0];
-        const ext = path.extname(file.originalFilename).toLowerCase();
-        const allowed = ['.jpg', '.jpeg', '.png', '.webp'];
-
-        if (!allowed.includes(ext)) {
-          return res.status(415).json({ message: '❌ فقط فایل‌های تصویری مجاز هستند' });
-        }
-
-        const fileName = `${Date.now()}-${file.originalFilename.replace(/\s+/g, '-')}`;
-        const newPath = path.join(process.cwd(), 'public', 'uploads', fileName);
-
-        fs.renameSync(file.filepath, newPath);
-        imagePath = `/uploads/${fileName}`;
-      }
-
-      const category = await Category.create({
-        title,
-        slug,
-        description,
-        ...(imagePath && { image: imagePath }),
-      });
-
-      return res.status(201).json({ category });
-    });
-    return;
-  }
+  const session = await requireRole(req, res, ['admin']);
+  if (!session) return;
 
   if (req.method === 'GET') {
-    const categories = await Category.find();
-    return res.status(200).json({ categories });
+    const [rows] = await db.query('SELECT * FROM categories ORDER BY id DESC');
+    return res.status(200).json(rows);
   }
 
-  res.status(405).end();
+  if (req.method === 'POST') {
+    const { name } = req.body;
+    if (!name || name.trim() === '') {
+      return res.status(400).json({ error: 'نام دسته‌بندی الزامی است.' });
+    }
+
+    const slug = slugify(name);
+
+    // بررسی یونیک بودن
+    const [exists] = await db.query('SELECT id FROM categories WHERE slug = ?', [slug]);
+    if (exists.length > 0) {
+      return res.status(400).json({ error: 'این دسته‌بندی قبلاً ثبت شده است.' });
+    }
+
+    const [result] = await db.query('INSERT INTO categories (name, slug) VALUES (?, ?)', [name, slug]);
+    await logAudit({
+      userId: session.user.id,
+      entity: 'category',
+      entityId: result.insertId,
+      action: 'create',
+      changes: { name: { to: name }, slug: { to: slug } }
+    });
+
+    return res.status(201).json({ id: result.insertId, name, slug });
+  }
+
+  res.status(405).json({ error: 'Method not allowed' });
 }

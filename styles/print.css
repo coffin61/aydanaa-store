@@ -1,0 +1,19 @@
+/* styles/print.css */
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #invoice-print, #invoice-print * {
+    visibility: visible !important;
+  }
+
+  #invoice-print {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 20px;
+    background: white;
+  }
+}

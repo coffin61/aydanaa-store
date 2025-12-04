@@ -1,3 +1,33 @@
+/* دستورات پایه Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* تعریف فونت لوکال Vazirmatn */
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn/Vazirmatn-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Vazirmatn';
+  src: url('/fonts/Vazirmatn/Vazirmatn-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* استایل‌های عمومی پروژه */
+html, body {
+  font-family: 'Vazirmatn', sans-serif;
+  background-color: #f9f9f9;
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}

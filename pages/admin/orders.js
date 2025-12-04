@@ -1,51 +1,58 @@
+// pages/admin/orders.js
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 
-export default function OrderListPage() {
+export default function AdminOrdersPage() {
   const [orders, setOrders] = useState([]);
 
   useEffect(() => {
-    fetch('/api/orders')
-      .then((res) => res.json())
-      .then((data) => setOrders(data));
+    const stored = JSON.parse(localStorage.getItem('orders') || '[]');
+    setOrders(stored);
   }, []);
 
+  const updateStatus = (id, newStatus) => {
+    const updated = orders.map((order) =>
+      order.id === id ? { ...order, status: newStatus } : order
+    );
+    setOrders(updated);
+    localStorage.setItem('orders', JSON.stringify(updated));
+    toast.success(`وضعیت سفارش ${id} به "${newStatus}" تغییر کرد`);
+  };
+
   return (
-    <div className="max-w-6xl mx-auto p-8 space-y-6">
-      <h1 className="text-2xl font-bold text-purple-700">📦 لیست سفارش‌ها</h1>
+    <div className="max-w-5xl mx-auto p-6">
+      <h1 className="text-2xl font-bold mb-6">📦 سفارش‌های ثبت‌شده</h1>
 
       {orders.length === 0 ? (
-        <p className="text-gray-500">هیچ سفارشی ثبت نشده.</p>
+        <p className="text-gray-500">هیچ سفارشی ثبت نشده است.</p>
       ) : (
         <table className="w-full border text-sm">
           <thead className="bg-gray-100">
             <tr>
-              <th className="border p-2">مشتری</th>
-              <th className="border p-2">شماره تماس</th>
-              <th className="border p-2">مبلغ</th>
-              <th className="border p-2">وضعیت</th>
-              <th className="border p-2">تعداد آیتم</th>
-              <th className="border p-2">زمان ثبت</th>
-              <th className="border p-2">جزئیات</th>
+              <th className="p-2">شماره سفارش</th>
+              <th className="p-2">تاریخ</th>
+              <th className="p-2">مبلغ</th>
+              <th className="p-2">وضعیت</th>
+              <th className="p-2">تغییر وضعیت</th>
             </tr>
           </thead>
           <tbody>
             {orders.map((order) => (
-              <tr key={order._id}>
-                <td className="border p-2">{order.customer?.name}</td>
-                <td className="border p-2">{order.customer?.phone}</td>
-                <td className="border p-2">{order.total.toLocaleString()} تومان</td>
-                <td className="border p-2">{order.status}</td>
-                <td className="border p-2">{order.items.length}</td>
-                <td className="border p-2">
-                  {new Date(order.createdAt).toLocaleString('fa-IR')}
-                </td>
-                <td className="border p-2">
-                  <a
-                    href={`/admin/orders/${order._id}`}
-                    className="text-blue-600 hover:underline"
+              <tr key={order.id} className="border-t">
+                <td className="p-2 font-mono text-xs text-gray-700">{order.id}</td>
+                <td className="p-2">{new Date(order.createdAt).toLocaleDateString()}</td>
+                <td className="p-2 text-green-700 font-bold">{order.total.toLocaleString()} تومان</td>
+                <td className="p-2">{order.status}</td>
+                <td className="p-2">
+                  <select
+                    value={order.status}
+                    onChange={(e) => updateStatus(order.id, e.target.value)}
+                    className="border rounded px-2 py-1"
                   >
-                    مشاهده
-                  </a>
+                    <option>در حال پردازش</option>
+                    <option>ارسال شده</option>
+                    <option>تحویل داده شده</option>
+                  </select>
                 </td>
               </tr>
             ))}

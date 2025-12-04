@@ -1,39 +1,38 @@
-import connectToDatabase from '@/lib/mongodb';
-import Order from '@/models/Order';
+// pages/api/orders/history-stats.js
+import pool from '../../../lib/db';
 
 export default async function handler(req, res) {
-  try {
-    await connectToDatabase();
+  if (req.method !== 'GET') {
+    return res.status(405).json({ message: 'Method not allowed' });
+  }
 
-    // دریافت سفارش‌هایی که تاریخچه دارند
-    const orders = await Order.find({
-      history: { $exists: true, $not: { $size: 0 } },
-    }).select('history').lean();
+  try {
+    // گرفتن تاریخچه سفارش‌ها از جدول order_history
+    // فرض: جدول order_history شامل فیلدهای: id, order_id, field, changedAt, changedBy
+    const [rows] = await pool.query('SELECT * FROM order_history');
 
     const stats = {};
 
-    orders.forEach((order) => {
-      order.history.forEach((h) => {
-        const date = new Date(h.changedAt).toISOString().slice(0, 10); // YYYY-MM-DD
-        const field = h.field;
-        const user = h.changedBy || 'ناشناس';
+    rows.forEach((h) => {
+      const date = new Date(h.changedAt).toISOString().slice(0, 10); // YYYY-MM-DD
+      const field = h.field;
+      const user = h.changedBy || 'ناشناس';
 
-        // ساختار آماری برای هر روز
-        if (!stats[date]) {
-          stats[date] = {
-            total: 0,
-            status: 0,
-            note: 0,
-            users: {},
-          };
-        }
+      // ساختار آماری برای هر روز
+      if (!stats[date]) {
+        stats[date] = {
+          total: 0,
+          status: 0,
+          note: 0,
+          users: {},
+        };
+      }
 
-        stats[date].total += 1;
-        if (field === 'status') stats[date].status += 1;
-        if (field === 'note') stats[date].note += 1;
+      stats[date].total += 1;
+      if (field === 'status') stats[date].status += 1;
+      if (field === 'note') stats[date].note += 1;
 
-        stats[date].users[user] = (stats[date].users[user] || 0) + 1;
-      });
+      stats[date].users[user] = (stats[date].users[user] || 0) + 1;
     });
 
     res.status(200).json(stats);

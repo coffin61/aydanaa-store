@@ -1,51 +1,44 @@
-import Link from 'next/link';
+// components/ProductCard.js
+import Image from 'next/image';
 
-export default function ProductCard({ title, price, image, id }) {
-  const handleAddToCart = () => {
-    const cart = JSON.parse(localStorage.getItem('cart')) || [];
-
-    const existingItem = cart.find((item) => item.id === id);
-
-    if (existingItem) {
-      existingItem.quantity += 1;
-    } else {
-      cart.push({
-        id,
-        title,
-        price: parseInt(price), // 👈 تبدیل مطمئن به عدد
-        image,
-        quantity: 1,
-      });
-    }
-
-    localStorage.setItem('cart', JSON.stringify(cart));
-    alert('محصول به سبد خرید اضافه شد!');
-  };
+export default function ProductCard({ product = {} }) {
+  // مقداردهی پیش‌فرض برای جلوگیری از خطا
+  const {
+    id = `tmp-${Math.random().toString(36).slice(2)}`,
+    name = 'بدون عنوان',
+    description = 'توضیحات موجود نیست',
+    price = 0,
+    image = '/placeholder.png',
+    category = {},
+    brand = {},
+  } = product;
 
   return (
-    <div className="bg-white shadow-md rounded-lg overflow-hidden w-64">
-      <Link href={`/product/${id}`}>
-        <img
+    <div className="border rounded-lg shadow-sm bg-white overflow-hidden hover:shadow-md transition">
+      {/* تصویر محصول */}
+      <div className="relative w-full h-48">
+        <Image
           src={image}
-          alt={title}
-          className="w-full h-40 object-cover cursor-pointer"
+          alt={name}
+          fill
+          style={{ objectFit: 'cover' }}
         />
-      </Link>
-      <div className="p-4">
-        <h3 className="text-lg font-semibold mb-2">{title}</h3>
-        <p className="text-blue-600 font-bold mb-4">{parseInt(price).toLocaleString()} تومان</p>
-        <div className="flex gap-2">
-          <Link href={`/product/${id}`} className="flex-1">
-            <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 w-full">
-              مشاهده جزئیات
-            </button>
-          </Link>
-          <button
-            onClick={handleAddToCart}
-            className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600 w-full"
-          >
-            افزودن
-          </button>
+      </div>
+
+      {/* جزئیات محصول */}
+      <div className="p-4 space-y-2">
+        <h3 className="text-lg font-light text-neutral-800">{name}</h3>
+        <p className="text-sm text-neutral-500 line-clamp-2">{description}</p>
+
+        {/* قیمت */}
+        <p className="text-base font-semibold text-green-600">
+          {price.toLocaleString()} تومان
+        </p>
+
+        {/* دسته و برند */}
+        <div className="text-xs text-neutral-400">
+          {category?.name && <span>📂 {category.name}</span>}
+          {brand?.name && <span className="ml-2">🏷️ {brand.name}</span>}
         </div>
       </div>
     </div>

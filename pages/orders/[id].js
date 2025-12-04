@@ -1,6 +1,8 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import dayjs from 'dayjs';
+import toast from 'react-hot-toast';
 
 export default function OrderDetailsPage() {
   const router = useRouter();
@@ -27,7 +29,7 @@ export default function OrderDetailsPage() {
 
   const handleUpdate = async () => {
     if (!session?.user?.email) {
-      alert('ابتدا وارد حساب شوید');
+      toast.error('⛔ ابتدا وارد حساب شوید');
       return;
     }
 
@@ -36,14 +38,14 @@ export default function OrderDetailsPage() {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
-        'x-user': session.user.email, // 👈 گرفتن اپراتور از session
+        'x-user': session.user.email,
       },
       body: JSON.stringify({ status: newStatus, note }),
     });
     const updated = await res.json();
     setOrder(updated);
     setSaving(false);
-    alert('✅ تغییرات ذخیره شد');
+    toast.success('✅ تغییرات ذخیره شد');
   };
 
   const handleDelete = async () => {
@@ -51,7 +53,7 @@ export default function OrderDetailsPage() {
     setDeleting(true);
     const res = await fetch(`/api/orders/${id}`, { method: 'DELETE' });
     const result = await res.json();
-    alert(result.message);
+    toast.success(result.message);
     router.push('/orders');
   };
 
@@ -61,17 +63,16 @@ export default function OrderDetailsPage() {
 
   return (
     <div className="max-w-3xl mx-auto p-8 space-y-6">
-      <h1 className="text-2xl font-bold text-red-600">📄 جزئیات سفارش</h1>
+      <h1 className="text-2xl font-bold text-red-600">📄 جزئیات سفارش #{order.id}</h1>
 
       {/* اطلاعات سفارش */}
       <div className="bg-white shadow p-4 rounded space-y-2">
-        <p><strong>شناسه:</strong> {order._id}</p>
-        <p><strong>نام مشتری:</strong> {order.customer.name}</p>
-        <p><strong>تلفن:</strong> {order.customer.phone}</p>
-        <p><strong>آدرس:</strong> {order.customer.address}</p>
-        <p><strong>تاریخ:</strong> {new Date(order.date).toLocaleString('fa-IR')}</p>
+        <p><strong>نام مشتری:</strong> {order.customer?.name || '—'}</p>
+        <p><strong>تلفن:</strong> {order.customer?.phone || '—'}</p>
+        <p><strong>آدرس:</strong> {order.customer?.address || '—'}</p>
+        <p><strong>تاریخ:</strong> {dayjs(order.date).format('YYYY-MM-DD HH:mm')}</p>
         <p><strong>وضعیت فعلی:</strong> {order.status}</p>
-        <p><strong>مبلغ کل:</strong> {order.total.toLocaleString()} تومان</p>
+        <p><strong>مبلغ کل:</strong> {parseFloat(order.total).toLocaleString()} تومان</p>
         {order.note && <p><strong>یادداشت:</strong> {order.note}</p>}
       </div>
 
@@ -83,9 +84,11 @@ export default function OrderDetailsPage() {
           onChange={(e) => setNewStatus(e.target.value)}
           className="border px-4 py-2 rounded"
         >
-          <option value="در حال پردازش">در حال پردازش</option>
-          <option value="ارسال شده">ارسال شده</option>
-          <option value="لغو شده">لغو شده</option>
+          <option value="pending">در انتظار</option>
+          <option value="paid">پرداخت شده</option>
+          <option value="shipped">ارسال شده</option>
+          <option value="delivered">تحویل شده</option>
+          <option value="canceled">لغو شده</option>
         </select>
 
         <label className="block font-medium mt-4">یادداشت سفارش:</label>
@@ -132,7 +135,7 @@ export default function OrderDetailsPage() {
               <tr key={index}>
                 <td className="border p-2">{item.title}</td>
                 <td className="border p-2">{item.quantity}</td>
-                <td className="border p-2">{item.price.toLocaleString()} تومان</td>
+                <td className="border p-2">{item.price?.toLocaleString() || '—'} تومان</td>
                 <td className="border p-2">{item.category || 'نامشخص'}</td>
               </tr>
             ))}
@@ -164,7 +167,7 @@ export default function OrderDetailsPage() {
                     <td className="border p-2">{h.oldValue || '—'}</td>
                     <td className="border p-2">{h.newValue || '—'}</td>
                     <td className="border p-2">
-                      {new Date(h.changedAt).toLocaleString('fa-IR')}
+                      {dayjs(h.changedAt).format('YYYY-MM-DD HH:mm')}
                     </td>
                     <td className="border p-2">{h.changedBy || '—'}</td>
                   </tr>

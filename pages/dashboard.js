@@ -10,8 +10,10 @@ import {
   BarElement,
   Tooltip,
   Legend,
+  Title,
 } from 'chart.js';
 import dayjs from 'dayjs';
+import Link from 'next/link';
 
 Chart.register(
   CategoryScale,
@@ -21,12 +23,15 @@ Chart.register(
   ArcElement,
   BarElement,
   Tooltip,
-  Legend
+  Legend,
+  Title
 );
 
 export default function DashboardPage() {
   const [stats, setStats] = useState(null);
   const [range, setRange] = useState('30d');
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   useEffect(() => {
     fetch('/api/stats')
@@ -61,15 +66,15 @@ export default function DashboardPage() {
     dayjs(o.date).isAfter(prevRangeDate) && dayjs(o.date).isBefore(rangeDate)
   );
 
-  const currentTotal = currentOrders.reduce((sum, o) => sum + o.total, 0);
-  const previousTotal = previousOrders.reduce((sum, o) => sum + o.total, 0);
+  const currentTotal = currentOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
+  const previousTotal = previousOrders.reduce((sum, o) => sum + parseFloat(o.total), 0);
   const growth = previousTotal === 0 ? 0 : ((currentTotal - previousTotal) / previousTotal) * 100;
 
   // فروش روزانه
   const dailySales = {};
   currentOrders.forEach((order) => {
     const date = new Date(order.date).toISOString().split('T')[0];
-    dailySales[date] = (dailySales[date] || 0) + order.total;
+    dailySales[date] = (dailySales[date] || 0) + parseFloat(order.total);
   });
   const dailyLabels = Object.keys(dailySales);
   const dailyValues = Object.values(dailySales);
@@ -92,26 +97,70 @@ export default function DashboardPage() {
   const productLabels = Object.keys(productCounts);
   const productValues = Object.values(productCounts);
 
+  // فیلتر و جستجو روی سفارش‌ها
+  const filteredOrders = currentOrders.filter((order) => {
+    const matchesSearch =
+      order.id.toString().includes(search) ||
+      order.status.toLowerCase().includes(search.toLowerCase()) ||
+      order.items.some((item) =>
+        item.title.toLowerCase().includes(search.toLowerCase())
+      );
+
+    const matchesStatus =
+      statusFilter === 'all' ? true : order.status === statusFilter;
+
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="max-w-6xl mx-auto p-8 space-y-12">
       <h1 className="text-3xl font-bold text-red-600">📊 داشبورد فروش</h1>
 
-      {/* فیلتر بازه زمانی */}
-      <div className="mb-6">
-        <label className="block mb-2 font-medium">بازه زمانی:</label>
-        <select
-          value={range}
-          onChange={(e) => setRange(e.target.value)}
-          className="border px-4 py-2 rounded"
-        >
-          <option value="7d">۷ روز گذشته</option>
-          <option value="30d">۳۰ روز گذشته</option>
-          <option value="90d">۹۰ روز گذشته</option>
-          <option value="all">همه سفارش‌ها</option>
-        </select>
+      {/* فیلتر بازه زمانی + جستجو + وضعیت */}
+      <div className="mb-6 flex flex-wrap gap-4">
+        <div>
+          <label className="block mb-2 font-medium">بازه زمانی:</label>
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="border px-4 py-2 rounded"
+          >
+            <option value="7d">۷ روز گذشته</option>
+            <option value="30d">۳۰ روز گذشته</option>
+            <option value="90d">۹۰ روز گذشته</option>
+            <option value="all">همه سفارش‌ها</option>
+          </select>
+        </div>
+
+        <div>
+          <label className="block mb-2 font-medium">جستجو:</label>
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="شناسه، وضعیت یا محصول..."
+            className="border px-4 py-2 rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block mb-2 font-medium">فیلتر وضعیت:</label>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border px-4 py-2 rounded"
+          >
+            <option value="all">همه</option>
+            <option value="pending">در انتظار</option>
+            <option value="paid">پرداخت شده</option>
+            <option value="shipped">ارسال شده</option>
+            <option value="delivered">تحویل شده</option>
+            <option value="canceled">لغو شده</option>
+          </select>
+        </div>
       </div>
 
-      {/* کارت‌های آماری مقایسه‌ای */}
+      {/* کارت‌های آماری */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white shadow p-4 rounded">
           <h3 className="text-sm text-gray-500 mb-1">مجموع فروش در بازه فعلی</h3>
@@ -156,7 +205,7 @@ export default function DashboardPage() {
             datasets: [
               {
                 data: statusValues,
-                backgroundColor: ['#f87171', '#60a5fa', '#34d399'],
+                backgroundColor: ['#f87171', '#60a5fa', '#34d399', '#fbbf24', '#9ca3af'],
               },
             ],
           }}
@@ -178,6 +227,58 @@ export default function DashboardPage() {
             ],
           }}
         />
+      </div>
+
+      {/* لیست سفارش‌ها با فیلتر و جستجو */}
+      <div>
+        <h2 className="text-xl font-semibold mb-4">لیست سفارش‌ها</h2>
+        <div className="bg-white shadow rounded p-4 overflow-x-auto">
+                    <table className="min-w-full border-collapse">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="border px-4 py-2">شناسه</th>
+                <th className="border px-4 py-2">تاریخ</th>
+                <th className="border px-4 py-2">وضعیت</th>
+                <th className="border px-4 py-2">مجموع</th>
+                <th className="border px-4 py-2">آیتم‌ها</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredOrders.map((order) => (
+                <tr key={order.id} className="hover:bg-gray-50">
+                  <td className="border px-4 py-2">
+                    <Link href={`/orders/${order.id}`} className="text-blue-600 hover:underline">
+                      {order.id}
+                    </Link>
+                  </td>
+                  <td className="border px-4 py-2">
+                    {dayjs(order.date).format('YYYY-MM-DD HH:mm')}
+                  </td>
+                  <td className="border px-4 py-2">{order.status}</td>
+                  <td className="border px-4 py-2">
+                    {parseFloat(order.total).toLocaleString()} تومان
+                  </td>
+                  <td className="border px-4 py-2">
+                    <ul className="list-disc list-inside">
+                      {order.items.map((item, idx) => (
+                        <li key={idx}>
+                          {item.title} × {item.quantity}
+                        </li>
+                      ))}
+                    </ul>
+                  </td>
+                </tr>
+              ))}
+              {filteredOrders.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="text-center text-gray-500 py-4">
+                    هیچ سفارشی مطابق فیلتر و جستجو یافت نشد.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
